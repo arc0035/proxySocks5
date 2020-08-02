@@ -72,16 +72,10 @@ public class Socks5Server implements Closeable {
         socks5Server.start();
     }
 
-    private static ServerConfig loadConfig(){
-        try(InputStream is = Socks5Server.class.getResourceAsStream("/server.properties")){
-            Properties properties = new Properties();
-            properties.load(is);
-            return ServerConfig.from(properties);
-        }
-        catch (Exception ex){
-            log.error("Error loading properties", ex);
-            return null;
-        }
+    private static ServerConfig loadConfig() throws IOException{
+        ServerConfig config = new ServerConfig();
+        config.load();
+        return config;
     }
 
 }

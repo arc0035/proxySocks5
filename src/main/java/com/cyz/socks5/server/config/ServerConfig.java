@@ -1,11 +1,22 @@
 package com.cyz.socks5.server.config;
 
+import com.cyz.socks5.server.Socks5Server;
 import com.cyz.socks5.server.enums.AuthenticationMethod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 
 public class ServerConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(ServerConfig.class);
+
+    /**
+     * 代理服务器本地ip
+     */
+    private String ip;
     /**
      * 端口绑定
      */
@@ -29,6 +40,13 @@ public class ServerConfig {
     public ServerConfig() {
     }
 
+    public String getIp() {
+        return ip;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
 
     public int getPort() {
         return port;
@@ -66,6 +84,9 @@ public class ServerConfig {
     @Override
     public String toString(){
         StringBuilder sb = new StringBuilder();
+        sb.append("ip:");
+        sb.append(this.ip);
+        sb.append("\n");
         sb.append("port:");
         sb.append(this.port);
         sb.append("\n");
@@ -81,17 +102,27 @@ public class ServerConfig {
         return sb.toString();
     }
 
-    public static ServerConfig from(Properties properties) {
+    public void load() throws IOException {
+        Properties properties = new Properties();;
+        try(InputStream is = Socks5Server.class.getResourceAsStream("/server.properties")){
+            properties.load(is);
+        }
+        catch (IOException ex){
+            logger.error("Error loading properties", ex);
+            throw ex;
+        }
+
+        String ip = properties.getProperty("ip","0.0.0.0");
         int port = Integer.parseInt(properties.getProperty("port", "1080"));
         int backLog = Integer.parseInt(properties.getProperty("back-log", "5"));
         int maxClients = Integer.parseInt(properties.getProperty("max-clients", "10"));
         AuthenticationMethod authenticationMethod = AuthenticationMethod.fromName(properties.getProperty("auth-method", "none"));
-        ServerConfig config = new ServerConfig();
+        ServerConfig config = this;
+        config.setIp(ip);
         config.setPort(port);
         config.setBackLog(backLog);
         config.setMaxClients(maxClients);
         config.setAuthenticationMethod(authenticationMethod);
-        return config;
     }
 
 

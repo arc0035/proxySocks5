@@ -18,7 +18,7 @@ public enum ServerStatusEnum {
     /**
      * 认证阶段完成
      */
-    WaitingForCommand,
+    CommandProcess,
 
     /**
      * 已经连接完毕

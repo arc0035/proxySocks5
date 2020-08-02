@@ -38,7 +38,7 @@ public class AuthenticatingState implements ProxyState {
             result.serialize(this.socket.getOutputStream());
             if(isAuthenticated){
                 logger.info("Authentication succeeded, waiting for command");
-                return new WaitingForCommandState(this.serverConfig, this.socket);
+                return new CommandProcessState(this.serverConfig, this.socket);
             }
             throw new ProxyServerException(ClientErrorEnum.AuthenticationFailed);
         }
