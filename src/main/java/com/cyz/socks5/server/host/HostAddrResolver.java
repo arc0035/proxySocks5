@@ -1,6 +1,6 @@
 package com.cyz.socks5.server.host;
 
-public interface HostAddr {
+public interface HostAddrResolver {
     byte[] toBytes(String host);
 
     String resolve(byte[] bytes);
