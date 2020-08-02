@@ -1,10 +1,11 @@
 package com.cyz.socks5.client;
 
+import com.cyz.socks5.server.HostResolver;
+import com.cyz.socks5.server.enums.AddrTypeEnum;
 import com.cyz.socks5.server.enums.AuthenticationMethod;
-import com.cyz.socks5.server.message.AuthenticationResultResponse;
-import com.cyz.socks5.server.message.HandshakeRequest;
-import com.cyz.socks5.server.message.HandshakeResponse;
-import com.cyz.socks5.server.message.UserPasswordAuthenticationRequest;
+import com.cyz.socks5.server.enums.CommandResponseEnum;
+import com.cyz.socks5.server.enums.CommandTypeEnum;
+import com.cyz.socks5.server.message.*;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -12,9 +13,11 @@ import java.net.Socket;
 public class Client {
 
     public static void main(String[] args) throws IOException {
+
         Socket socket = new Socket("127.0.0.1", 1080);
         testHandshake(socket);
         testAuthenticate(socket);
+        testCmd(socket);
     }
 
     private static void testHandshake(Socket socket) throws IOException {
@@ -45,7 +48,7 @@ public class Client {
         request.setPasswordLength((byte)pwd.getBytes().length);
 
         request.serialize(socket.getOutputStream());
-        socket.getOutputStream().flush();
+        //socket.getOutputStream().flush();
         System.out.println("Sending msg complete");
 
         AuthenticationResultResponse result = new AuthenticationResultResponse();
@@ -53,5 +56,20 @@ public class Client {
         System.out.println(result.getResult()==0x00?"认证成功":"认证失败");
     }
 
+
+    private static void testCmd(Socket socket) throws IOException {
+        System.out.println("发送命令");
+        CommandRequest request = new CommandRequest();
+        request.setCmd((byte)CommandTypeEnum.CONNECT.getCode());
+        request.setAddressType((byte)AddrTypeEnum.DOMAIN.getCode());
+        request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), "www.baidu.com"));
+        request.setDstPort(80);
+        request.serialize(socket.getOutputStream());
+        System.out.println("Sending cmd msg complete");
+
+        CommandResponse result = new CommandResponse();
+        result.deserialize(socket.getInputStream());
+        System.out.println(CommandResponseEnum.fromCode(result.getResponse()).name());
+    }
 
 }

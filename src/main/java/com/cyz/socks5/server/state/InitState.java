@@ -56,7 +56,6 @@ public class InitState implements ProxyState {
             response.setMethod((byte)this.serverConfig.getAuthenticationMethod().getCode());
             response.serialize(os);
             //切换状态
-            logger.info("entering into Authenticating state");
             return new AuthenticatingState(this.serverConfig, this.socket);
         }
         catch (ProxyServerException pse){

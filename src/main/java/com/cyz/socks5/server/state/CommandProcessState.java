@@ -40,15 +40,16 @@ public class CommandProcessState implements ProxyState{
             return handleCmd(request);
         }
         catch (ProxyServerException pse){
-            logger.warn("Authentication failed, switch to basic status :{}", pse.getMessage());
+            logger.error("Command process failed, {}", pse.getMessage());
             //状态切换
-            return new InitState(this.serverConfig, this.socket);
+            return this;
         }
     }
 
     private ProxyState handleCmd(CommandRequest request) throws IOException {
         byte opcode = request.getCmd();
-        CommandEnum cmd = CommandEnum.fromCode(opcode);
+        CommandTypeEnum cmd = CommandTypeEnum.fromCode(opcode);
+        logger.info("receiving command "+cmd);
         switch (cmd){
             case CONNECT:{
                 return onConnect(request);
@@ -89,11 +90,13 @@ public class CommandProcessState implements ProxyState{
         int port = request.getDstPort();
         Socket tgtSocket = null;
         try{
+            logger.info("making connection to {}:{}", host, port);
             tgtSocket = new Socket(host, port);
         }
         catch (IOException ex){
             return onConnectionFailed(ex);
         }
+        logger.info("Connection established to {}:{}", host, port);
         //回复客户端成功
         CommandResponse cmdResponse = new CommandResponse();
         cmdResponse.setVersion((byte)0x05);
@@ -134,7 +137,6 @@ public class CommandProcessState implements ProxyState{
     }
 
     private ProxyState onConnectionFailed(IOException ex) throws IOException {
-        ;
         String message = ex.getMessage().toLowerCase();
         logger.warn(message);
         CommandResponseEnum error = null;
@@ -142,6 +144,8 @@ public class CommandProcessState implements ProxyState{
             error = CommandResponseEnum.REFUSED;
         }
         else{
+            //例如：
+            //SocketException: connection timed out: connect
             error = CommandResponseEnum.BAD_NETWORK;
         }
         CommandResponse response = new CommandResponse();

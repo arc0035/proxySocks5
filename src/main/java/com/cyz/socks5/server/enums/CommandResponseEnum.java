@@ -1,6 +1,5 @@
 package com.cyz.socks5.server.enums;
 
-import com.cyz.socks5.server.message.CommandResponse;
 
 /**
  * 命令响应类型
@@ -20,6 +19,15 @@ public enum  CommandResponseEnum {
 
     CommandResponseEnum(int code){
         this.code = code;
+    }
+
+    public static CommandResponseEnum fromCode(int response) {
+        for(CommandResponseEnum val: CommandResponseEnum.values()){
+            if(val.code == response){
+                return val;
+            }
+        }
+        return null;
     }
 
     public int getCode() {

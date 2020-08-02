@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.Socket;
+import java.net.SocketException;
 
 /**
  * 专门负责和一个客户端的代理任务
@@ -37,11 +38,26 @@ public class SocketHandler implements Runnable, Closeable {
         while (state != null  && state != DisconnectedState.INSTANCE) {
             try{
                 state = state.next();
+                log.info("new state:{}",state.getStatus().name());
             }
-            catch (Exception io){
+            catch (SocketException socketEx){
+                //例如调用read()读取数据时，客户端已经断开连接，就会报Socket exception: connection reset
+                log.warn("socket exception, so close the thread", socketEx);
+                state = DisconnectedState.INSTANCE;
+            }
+            catch (Exception ex){
+                //如果抛出异常，应该属于编程失误
+                log.error("Sever exception ",ex);
                 state = DisconnectedState.INSTANCE;
             }
         }
+
+        try{
+            this.close();
+        }
+        catch (Exception ex){}
+
+        log.info("关闭端口，退出线程 {}",Thread.currentThread().getName());
     }
 
 

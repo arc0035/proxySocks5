@@ -1,6 +1,7 @@
 package com.cyz.socks5.server.message;
 
 import com.cyz.socks5.server.enums.AddrTypeEnum;
+import com.cyz.socks5.server.util.CommandUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,7 +15,7 @@ public class CommandRequest implements SocksMessage{
     /**
      * 版本号
      */
-    private byte version;
+    private byte version = 0x05;
 
     /**
      * 命令，包括CONNECT, BIND, UDP
@@ -64,13 +65,15 @@ public class CommandRequest implements SocksMessage{
         int addressType = is.read();
         byte[] addr = null;
         if (addressType == AddrTypeEnum.IPV4.getCode()) {
-            addr = readIpv4(is);
+            addr = CommandUtil.readIpv4(is);
         } else if (addressType == AddrTypeEnum.DOMAIN.getCode()) {
-            addr = readDomain(is);
+            addr = CommandUtil.readDomain(is);
         } else if (addressType == AddrTypeEnum.IPV6.getCode()) {
-            addr = readIpv6(is);
+            addr = CommandUtil.readIpv6(is);
         }
-        int dstPort = (is.read() << 8 + is.read()) & 0xFFFF;
+        int c1 = is.read();
+        int c2 = is.read();
+        int dstPort = ((c1 << 8) + c2) & 0xFFFF;
         this.version = (byte) version;
         this.cmd = (byte) cmd;
         this.rsv = (byte) rsv;
@@ -78,32 +81,6 @@ public class CommandRequest implements SocksMessage{
         this.dstAddr = addr;
         this.dstPort = dstPort;
     }
-
-    private byte[] readIpv4(InputStream is) throws IOException {
-        return readFully(is, 4);
-    }
-
-    private byte[] readDomain(InputStream is) throws IOException {
-        int length = is.read();
-        byte[] domainData = readFully(is, length);
-        byte[] result = new byte[length+1];
-        result[0] = (byte)length;
-        System.arraycopy(domainData,0, result, 1, length);
-        return result;
-    }
-
-    private byte[] readIpv6(InputStream is) throws IOException {
-        return readFully(is, 16);
-    }
-    private byte[] readFully(InputStream is, int length) throws IOException{
-        byte[] bytes = new byte[length];
-        int nread= 0 ;
-        while (nread < length){
-            nread += is.read(bytes, nread, length - nread);
-        }
-        return bytes;
-    }
-
 
     public void setVersion(byte version) {
         this.version = version;
