@@ -12,7 +12,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.channels.SocketChannel;
 
 /**
  * 认证完成，开始正常的socks命令
@@ -74,7 +77,8 @@ public class CommandProcessState implements ProxyState{
     }
 
     private ProxyState onConnect(CommandRequest request) throws IOException{
-        //与目标服务器建立tcp连接
+        //解析地址
+
         String host = null;
         try{
             host = this.hostResolver.resolveHost(request.getAddressType(), request.getDstAddr());
@@ -88,10 +92,13 @@ public class CommandProcessState implements ProxyState{
             return onBadHost();
         }
         int port = request.getDstPort();
-        Socket tgtSocket = null;
+        //目标服务器建立tcp连接
+        SocketChannel tgtChannel = null;
         try{
             logger.info("making connection to {}:{}", host, port);
-            tgtSocket = new Socket(host, port);
+            tgtChannel = SocketChannel.open();
+            InetAddress tgtInet = InetAddress.getByName(host);
+            tgtChannel.connect(new InetSocketAddress(tgtInet, port));
         }
         catch (IOException ex){
             return onConnectionFailed(ex);
@@ -106,9 +113,8 @@ public class CommandProcessState implements ProxyState{
         cmdResponse.setBndPort(this.serverConfig.getPort());
         cmdResponse.serialize(this.socket.getOutputStream());
         //切换到connected状态
-        return new ConnectedState(this.socket, tgtSocket);
+        return new ConnectedState(this.socket.getChannel(), tgtChannel);
     }
-
 
 
     private ProxyState onBind(CommandRequest request){
@@ -137,10 +143,10 @@ public class CommandProcessState implements ProxyState{
     }
 
     private ProxyState onConnectionFailed(IOException ex) throws IOException {
-        String message = ex.getMessage().toLowerCase();
+        String message = "error:"+ex.getMessage();
         logger.warn(message);
         CommandResponseEnum error = null;
-        if (ex instanceof ConnectException && message.contains("refuse")) {
+        if (ex instanceof ConnectException && message.contains("refused")) {
             error = CommandResponseEnum.REFUSED;
         }
         else{

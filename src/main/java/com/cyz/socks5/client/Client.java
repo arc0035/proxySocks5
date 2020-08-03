@@ -18,6 +18,13 @@ public class Client {
         testHandshake(socket);
         testAuthenticate(socket);
         testCmd(socket);
+        testReplay(socket);
+    }
+
+    private static void testReplay(Socket socket) throws IOException {
+        byte[] bytes = "Hi".getBytes();
+        socket.getOutputStream().write(bytes);
+        System.in.read();
     }
 
     private static void testHandshake(Socket socket) throws IOException {
@@ -63,7 +70,9 @@ public class Client {
         request.setCmd((byte)CommandTypeEnum.CONNECT.getCode());
         request.setAddressType((byte)AddrTypeEnum.DOMAIN.getCode());
         request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), "www.baidu.com"));
+        //request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), "www.baiduahefa.com"));
         request.setDstPort(80);
+        //request.setDstPort(777);
         request.serialize(socket.getOutputStream());
         System.out.println("Sending cmd msg complete");
 
