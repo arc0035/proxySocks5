@@ -15,14 +15,18 @@ public class Client {
     public static void main(String[] args) throws IOException {
 
         Socket socket = new Socket("127.0.0.1", 1080);
+        //TODO：怎么控制连接时长？？？？？
         testHandshake(socket);
         testAuthenticate(socket);
         testCmd(socket);
         testReplay(socket);
+        testReplay(socket);
+        testReplay(socket);
+        System.in.read();
     }
 
     private static void testReplay(Socket socket) throws IOException {
-        byte[] bytes = "Hi".getBytes();
+        byte[] bytes = "Hello nio\n".getBytes();
         socket.getOutputStream().write(bytes);
         System.in.read();
     }

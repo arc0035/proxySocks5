@@ -35,7 +35,7 @@ public class SocketHandler implements Runnable, Closeable {
     public void run() {
         log.info("线程{}负责处理任务, 服务端口号:{}", Thread.currentThread().getName(), this.socket.getPort());
         ProxyState state = new InitState(this.serverConfig, this.socket);
-        while (state != null  && state != DisconnectedState.INSTANCE) {
+        while (state != null  && state != DisconnectedState.INSTANCE && state.getStatus() != ServerStatusEnum.Relaying) {
             try{
                 state = state.next();
                 log.info("new state:{}",state.getStatus().name());
@@ -62,7 +62,7 @@ public class SocketHandler implements Runnable, Closeable {
         }
         catch (Exception ex){}
 
-        log.info("关闭端口，退出线程 {}",Thread.currentThread().getName());
+        log.info("退出线程 {}",Thread.currentThread().getName());
     }
 
 

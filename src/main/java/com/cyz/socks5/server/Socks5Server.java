@@ -37,10 +37,11 @@ public class Socks5Server implements Closeable {
                     InetAddress.getByName(this.config.getIp()),
                     this.config.getPort()),
                 this.config.getBackLog());
-        this.executor = new ThreadPoolExecutor(this.config.getMaxClients(), this.config.getMaxClients(),
-                0, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), (r, executor) -> {
+        this.executor = new ThreadPoolExecutor(0, this.config.getMaxClients(),
+                60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), (r, executor) -> {
                     throw new RejectedExecutionException();
                 });
+        RelayingTask.start();
         log.info("Server started, listening on {}", config.getPort());
         while (true){
             try{
@@ -58,9 +59,7 @@ public class Socks5Server implements Closeable {
     }
 
     private void service(SocketChannel channel) throws IOException{
-        //Socket的IO永远是阻塞的。SocketChannel的IO可以是阻塞的，也可以是非阻塞的。
-        //这里让认证采用阻塞IO，流量转发采用非阻塞IO。尽量保持已有架构不变。
-        this.executor.execute(new SocketHandler(this.config, channel.socket()));
+        this.executor.execute(new SocketHandler(this.config,  channel.socket()));
     }
 
 

@@ -67,6 +67,7 @@ public class InitState implements ProxyState {
 
     private void verify(HandshakeRequest request){
         if(request.getVersion() != (byte)0x05){
+            logger.warn("version "+request.getVersion());
             throw new ProxyServerException(ClientErrorEnum.InvalidVersion);
         }
         if(request.getMethodCount() <= 0){

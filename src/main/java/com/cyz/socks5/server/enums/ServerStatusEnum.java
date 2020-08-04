@@ -31,6 +31,7 @@ public enum ServerStatusEnum {
     Binded,
 
 
+    Relaying,
     /**
      * 客户端断开连接
      */
