@@ -121,188 +121,117 @@ public class RelayingTask implements Runnable {
                 }
             }
             catch (Exception ex){
-                logger.error("Unpected ",ex);
+                logger.error("Unexpected ",ex);
             }
 
         }
     }
 
     private void handleReadyChannel(SelectionKey ready) throws IOException{
-        if(ready.isConnectable()){
-            SocketChannel channel = (SocketChannel) ready.channel();
-            if(channel.finishConnect()){
-                channel.register(selector, SelectionKey.OP_READ);
-            }
-            //reconnect((SocketChannel) ready.channel());
-        }
         if(ready.isReadable()){
             handleReadable(ready);
         }
+        else{
+            logger.error("Not readable");
+        }
     }
 
-    private void reconnect(SocketChannel remote) {
+    private boolean handlePeerFailed(SocketChannel remote) {
         if(this.clients.get(remote) != null){
-            logger.error("客户端挂了，不管!");
-            return;
+            logger.info("Client disconnected, try reconnect");
+            SocketChannel client = remote;
+            SocketChannel target = this.socksMap.get(client);
+            try{
+                //clearOld
+                SocketAddress addr = cleanSocketResource(client);
+                client.close();
+                SocketChannel newClient = SocketChannel.open(addr);
+                if(newClient.isConnected()){
+                    registerImpl(newClient, target);
+                    logger.info("Reconnect successful {}", newClient.getRemoteAddress());
+                    return true;
+                }
+            }
+            catch (IOException ex){
+                logger.error("Reconnect failed, releasing peer socket resource.", ex);
+                cleanSocketResource(target);
+                logger.info("{}",this.socksMap.size());
+                return false;
+            }
         }
-        SocketChannel client = this.socksMap.get(remote);
-        try{
-            SocketChannel newChannel = SocketChannel.open(this.remoteAddrs.get(remote));
-            //clearOld
-            this.socksMap.remove(remote);
-            this.bufMap.remove(remote);
-            this.clients.remove(remote);
-            this.remoteAddrs.remove(remote);
-            registerImpl(client, newChannel);
-            remote.close();
-            logger.info("重连成功 {}", newChannel.getRemoteAddress());
+        else{
+            logger.info("Target host disconnected, try reconnect");
+            SocketChannel target = remote;
+            SocketChannel client = this.socksMap.get(target);
+            try{
+                //clearOld
+                SocketAddress addr = cleanSocketResource(target);
+                SocketChannel newTarget = SocketChannel.open(addr);
+                if(newTarget.isConnected()){
+                    registerImpl(client, newTarget);
+                    logger.info("Reconnect successful {}", newTarget.getRemoteAddress());
+                    return true;
+                }
+            }
+            catch (IOException ex){
+                logger.error("Reconnect failed", ex);
+                return false;
+            }
         }
-        catch (IOException ex){
-            logger.error("重连也失败", ex);
+        return false;
+    }
+
+    private void handleReadable(SelectionKey readableKey) throws IOException{
+        SocketChannel sc = (SocketChannel) readableKey.channel();
+        ByteBuffer bb = doRead(sc);
+        if(bb != null){
+            SocketChannel partner = this.socksMap.get(sc);
+            doWrite(partner, bb);
         }
     }
 
-    private HandleChannelResult handleReadable(SelectionKey readableKey) throws IOException{
-        SocketChannel sc = (SocketChannel) readableKey.channel();
-        //Read !
+    private ByteBuffer doRead(SocketChannel sc){
         ByteBuffer bb = this.bufMap.get(sc);
         try {
             int n = sc.read(bb);
             if (n == -1) {
                 //https://stackoverflow.com/questions/7937908/java-selector-returns-selectionkey-with-op-read-without-data-in-infinity-loop-af
                 //or check OP_READ, select can return on remote closed
-                throw new IOException("读到-1");
+                throw new IOException("Read returns -1");
             }
-            logger.info("读取完毕，字节数" + n);
+            logger.info("relaying read {} bytes", n);
+            return bb;
         }
         catch (IOException ex){
-            logger.error("读数据发生IO异常:{}", remoteAddrs.get(sc), ex);
-            reconnect(sc);
-            return HandleChannelResult.Failed;
+            logger.error("Reading with exception on peer {}:", remoteAddrs.get(sc), ex);
+            handlePeerFailed(sc);
+            return null;
         }
-        //Write !
-        SocketChannel partner = this.socksMap.get(sc);
+    }
+
+    private void doWrite(SocketChannel partner, ByteBuffer bb){
         try{
             bb.flip();
             int n = partner.write(bb);
-            bb.clear();
-            logger.info("写入完毕，字节数"+n);
-            return HandleChannelResult.Success;
+            logger.info("relaying write {} bytes", n);
+            bb.compact();
         }
         catch (IOException ex){
-            logger.error("写数据发生IO异常:{}", remoteAddrs.get(partner), ex);
-            reconnect(partner);
-            return HandleChannelResult.Failed;
+            logger.error("Reading with exception on peer, {}", remoteAddrs.get(partner), ex);
+            handlePeerFailed(partner);
         }
     }
 
-    /*
-    private HandleChannelResult handleWritable(SelectionKey writableKey) throws IOException{
-        SocketChannel sc = (SocketChannel)writableKey.channel();
+    private SocketAddress cleanSocketResource(SocketChannel channel){
+        this.socksMap.remove(channel);
+        this.bufMap.remove(channel);
+        this.clients.remove(channel);
+        SocketAddress addr = this.remoteAddrs.remove(channel);
         try{
-            if(!writableKey.isWritable()){
-                return HandleChannelResult.NotType;
-            }
-            logger.info("writable");
-            ByteBuffer bb = this.bufMap.get(socksMap.get(sc));
-            bb.flip();
-            int n = sc.write(bb);
-            bb.clear();
-            if(n == -1){
-                return HandleChannelResult.Failed;
-            }
-            sc.register(selector, SelectionKey.OP_READ);//To prevent always writable.
-            return HandleChannelResult.Success;
-        }
-        catch (CancelledKeyException|ClosedChannelException ex){
-            ex.printStackTrace();
-            System.out.println("Remote addr:"+remoteAddrs.get(sc));
-            return HandleChannelResult.Failed;
-        }
-    }
-
-     */
-
-    private enum HandleChannelResult{
-
-        Failed,
-        Success,
-        NotType
-
-    }
-
-    /*
-    private void handleReadyChannels(HashMap<SocketChannel, SelectionKey> readyChannels) throws IOException{
-        for(Map.Entry<SocketChannel, SelectionKey> readyChannel: readyChannels.entrySet()) {
-            SocketChannel readChannel = readyChannel.getKey();
-            SelectionKey readKey = readyChannel.getValue();
-            SocketChannel writeChannel = this.socksMap.get(readChannel);
-            SelectionKey writeKey = readyChannels.get(writeChannel);
-            try {
-                if (!readKey.isReadable()) {
-                    continue;
-                }
-                if (writeKey == null || !writeKey.isWritable()) {
-                    logger.warn("peer not writable" + writeChannel.getRemoteAddress());
-                    continue;
-                }
-                ByteBuffer readBuffer = this.bufMap.get(readChannel);
-                int total = readChannel.read(readBuffer);
-                //https://stackoverflow.com/questions/7937908/java-selector-returns-selectionkey-with-op-read-without-data-in-infinity-loop-af
-                if (total == -1) {
-                    //Peer(client or tgt) disconnect...
-                    throw new ClosedChannelException();
-                }
-                readBuffer.flip();//flip for write
-                int n = 0;
-                while (n < total) {
-                    n += writeChannel.write(readBuffer);
-                    System.out.println("写入" + n);
-                }
-                readBuffer.clear();
-                logger.info("finish relay, data count: {}", total);
-            } catch (CancelledKeyException | ClosedChannelException ex) {
-                ex.printStackTrace();
-                onPeerDisconnect(readKey, writeKey);
-            }
-        }
-    }
-
-
-    private boolean isClient(SelectionKey key){
-        return this.clients.containsKey(key.channel());
-    }
-
-    private void closeEverything(SelectionKey readKey, SelectionKey writeKey){
-        SocketChannel readChannel =(SocketChannel) readKey.channel();
-        SocketChannel writeChannel = (SocketChannel)writeKey.channel();
-        readKey.cancel();
-        writeKey.cancel();
-        this.socksMap.remove(readChannel);
-        this.socksMap.remove(writeChannel);
-        this.bufMap.remove(readChannel);
-        this.bufMap.remove(writeChannel);
-        try{
-            readChannel.close();
-            writeChannel.close();
+            channel.close();
         }
         catch (Exception ex){}
-
-        logger.info("Relay channel closed");
+        return addr;
     }
-
-    private void fixConnection(SelectionKey tgtKey) throws IOException{
-        SocketChannel tgtChannel = (SocketChannel) tgtKey.channel();
-        SocketChannel clientChannel = this.socksMap.get(tgtChannel);
-        SocketAddress remoteAddress = tgtChannel.getRemoteAddress();//TODO:这里可能报错，需要提前把remoteAddress读出来注册
-        this.socksMap.remove(tgtChannel);
-        this.bufMap.remove(tgtChannel);
-        SocketChannel newChannel = SocketChannel.open();
-        newChannel.connect(remoteAddress);
-        registerImpl(newChannel, clientChannel);
-    }
-
-
-     */
 
 }

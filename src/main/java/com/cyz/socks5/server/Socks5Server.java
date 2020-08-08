@@ -28,7 +28,7 @@ public class Socks5Server implements Closeable {
 
     public synchronized void start() throws IOException {
         if(ssc != null){
-            log.warn("Server already started, cannot start again");
+            log.warn("Socks5 proxy server already started, cannot start again");
             return;
         }
         this.ssc = ServerSocketChannel.open();
@@ -42,7 +42,7 @@ public class Socks5Server implements Closeable {
                     throw new RejectedExecutionException();
                 });
         RelayingTask.start();
-        log.info("Server started, listening on {}", config.getPort());
+        log.info("Socks5 proxy server started, listening on {}", config.getPort());
         while (true){
             try{
                 //就用阻塞模式accept，没毛病

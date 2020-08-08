@@ -7,7 +7,9 @@ import com.cyz.socks5.server.enums.CommandResponseEnum;
 import com.cyz.socks5.server.enums.CommandTypeEnum;
 import com.cyz.socks5.server.message.*;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.Socket;
 import java.util.Arrays;
 
@@ -28,18 +30,35 @@ public class Client {
     public static void main(String[] args) throws Exception {
 
         Socket socket = new Socket("127.0.0.1", 1080);
-        //TODO：怎么控制连接时长？？？？？
         testHandshake(socket);
-        Thread.sleep(3000);
+        Thread.sleep(1000);
         testAuthenticate(socket);
-        Thread.sleep(3000);
-        testCmd(socket);
+        Thread.sleep(1000);
+        //testCmd(socket, "127.0.0.1",8000);
+        testCmd(socket, "www.baidu.com",80);
 
-        testReplay(socket);
-        testReplay(socket);
-        testReplay(socket);
-        System.in.read();
+        testChat(socket);
+    }
 
+    private static void testChat(Socket socket) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        while(true){
+            String line = reader.readLine();
+            if("bye".compareToIgnoreCase(line) == 0){
+                socket.close();
+                return;
+            }
+            socket.getOutputStream().write(line.getBytes());
+            byte[] bytes = new byte[1024];
+            int n = socket.getInputStream().read(bytes);
+            if(n <= 0){
+                System.out.println("读到："+n);
+            }
+            else{
+                System.out.println("[服务端]:"+new String(Arrays.copyOfRange(bytes, 0, n)));
+            }
+
+        }
     }
 
     private static void testReplay(Socket socket) throws Exception {
@@ -95,20 +114,20 @@ public class Client {
     }
 
 
-    private static void testCmd(Socket socket) throws IOException {
+    private static void testCmd(Socket proxy, String tgtHost, int tgtPort) throws IOException {
         System.out.println("发送命令");
         CommandRequest request = new CommandRequest();
         request.setCmd((byte)CommandTypeEnum.CONNECT.getCode());
         request.setAddressType((byte)AddrTypeEnum.DOMAIN.getCode());
-        request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), "www.baidu.com"));
+        request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), tgtHost));
         //request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), "www.baiduahefa.com"));
-        request.setDstPort(80);
+        request.setDstPort(tgtPort);
         //request.setDstPort(777);
-        request.serialize(socket.getOutputStream());
+        request.serialize(proxy.getOutputStream());
         System.out.println("Sending cmd msg complete");
 
         CommandResponse result = new CommandResponse();
-        result.deserialize(socket.getInputStream());
+        result.deserialize(proxy.getInputStream());
         System.out.println(CommandResponseEnum.fromCode(result.getResponse()).name());
     }
 
