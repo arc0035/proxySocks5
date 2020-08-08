@@ -9,15 +9,17 @@ import com.cyz.socks5.server.message.*;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.Arrays;
 
 /**
- * 以下现象表示连接已被关闭：
+ * 以下现象表示连接已无法IO，不一定关闭
  * java.net.SocketException: Software caused connection abort: socket write error
  * java.net.SocketException: connection reset by peer
- * KeyCancellationException
- * ClosedChannelException
+ * IOException: 你的主机中的软件中止了一个已建立的连接
+ * KeyCancellationException is throwned by isReadable(). This often caused by channel is closed and automatically deregistered
+ * ClosedChannelException is throwned by common io operations like getRemoteAddress。而且即使仅仅调研shutdownOutput，连接处于连接、打开状态，也会抛出
  * SelectionKey.isValid() returns false
- * read() returns -1.
+ * read() returns -1.(服务端close，或者shutdownOutput)
  *
  *
  */
@@ -36,7 +38,7 @@ public class Client {
         testReplay(socket);
         testReplay(socket);
         testReplay(socket);
-
+        System.in.read();
 
     }
 
@@ -44,6 +46,16 @@ public class Client {
         Thread.sleep(3000);
         byte[] bytes = "Hello nio\n".getBytes();
         socket.getOutputStream().write(bytes);
+        System.out.println("发送完毕");
+        bytes = new byte[1024];
+        int n = socket.getInputStream().read(bytes);
+        if(n <= 0){
+            System.out.println("返回数据:"+n);
+        }
+        else{
+            System.out.println(new String(Arrays.copyOfRange(bytes, 0, n)));
+        }
+
     }
 
     private static void testHandshake(Socket socket) throws IOException {

@@ -54,9 +54,9 @@ public class SwitchServer {
     private static void nioImpl(SocketChannel channel) throws IOException{
         System.out.println("切换到NIO状态");
         channel.configureBlocking(false);
-
         channel.register(selector, SelectionKey.OP_READ);
-
+        channel.shutdownOutput();
+        System.out.println(channel.isOpen() + " " +channel.isConnected() + " "+channel.isConnectionPending());
         while (true){
             int n = selector.select();
             if(n <= 0) continue;
@@ -84,7 +84,14 @@ public class SwitchServer {
                     System.arraycopy(world, 0, all, 1, world.length);
                      bb = ByteBuffer.wrap(all);
                     bb.clear();
-                    sc.write(bb);
+                    try{
+                        sc.write(bb);
+                    }
+                    catch (Exception ex){
+                        ex.printStackTrace();;
+                        System.out.println(channel.isOpen() + " " +channel.isConnected() + " "+channel.isConnectionPending());
+                    }
+
                 }
                 /*
                 if(key.isWritable()){
