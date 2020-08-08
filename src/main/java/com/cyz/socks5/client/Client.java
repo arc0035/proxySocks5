@@ -10,25 +10,40 @@ import com.cyz.socks5.server.message.*;
 import java.io.IOException;
 import java.net.Socket;
 
+/**
+ * 以下现象表示连接已被关闭：
+ * java.net.SocketException: Software caused connection abort: socket write error
+ * java.net.SocketException: connection reset by peer
+ * KeyCancellationException
+ * ClosedChannelException
+ * SelectionKey.isValid() returns false
+ * read() returns -1.
+ *
+ *
+ */
 public class Client {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws Exception {
 
         Socket socket = new Socket("127.0.0.1", 1080);
         //TODO：怎么控制连接时长？？？？？
         testHandshake(socket);
+        Thread.sleep(3000);
         testAuthenticate(socket);
+        Thread.sleep(3000);
         testCmd(socket);
+
         testReplay(socket);
         testReplay(socket);
         testReplay(socket);
-        System.in.read();
+
+
     }
 
-    private static void testReplay(Socket socket) throws IOException {
+    private static void testReplay(Socket socket) throws Exception {
+        Thread.sleep(3000);
         byte[] bytes = "Hello nio\n".getBytes();
         socket.getOutputStream().write(bytes);
-        System.in.read();
     }
 
     private static void testHandshake(Socket socket) throws IOException {

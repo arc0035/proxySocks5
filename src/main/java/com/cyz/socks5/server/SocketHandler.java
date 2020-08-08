@@ -69,8 +69,11 @@ public class SocketHandler implements Runnable, Closeable {
     @Override
     public void close() throws IOException {
         //可以通过soLinger选项指定socket在close时是否把未发送干净的数据都发送干净
+        /*
         if(socket != null){
             socket.close();;
         }
+
+         */
     }
 }

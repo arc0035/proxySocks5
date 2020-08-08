@@ -1,6 +1,5 @@
 package com.cyz.socks5.server;
 
-import com.cyz.socks5.server.error.RelayBrokenException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +20,7 @@ public class RelayingTask implements Runnable {
     private ConcurrentHashMap<SocketChannel, SocketChannel>  socksMap;
     private ConcurrentHashMap<SocketChannel, ByteBuffer>  bufMap;
     private ConcurrentHashMap<SocketChannel, Boolean> clients;
+    private ConcurrentHashMap<SocketChannel, SocketAddress> remoteAddrs;
     private Selector selector;
     private ReentrantLock selectorLock;
 
@@ -40,6 +40,7 @@ public class RelayingTask implements Runnable {
         this.socksMap = new ConcurrentHashMap<>();
         this.bufMap = new ConcurrentHashMap<>();
         this.clients = new ConcurrentHashMap<>();
+        this.remoteAddrs = new ConcurrentHashMap<>();
         this.selector = Selector.open();
         this.selectorLock = new ReentrantLock();
     }
@@ -55,13 +56,14 @@ public class RelayingTask implements Runnable {
 
     private boolean registerImpl(SocketChannel channel1, SocketChannel channel2) {
         try{
+            //Configure blocking to false after blocking reads will make the connection bad?!?!?!
             channel1.configureBlocking(false);
             channel2.configureBlocking(false);
             try{
                 this.selectorLock.lock();
                 this.selector.wakeup();//唤醒
-                channel1.register(selector, SelectionKey.OP_READ|SelectionKey.OP_WRITE);
-                channel2.register(selector, SelectionKey.OP_READ|SelectionKey.OP_WRITE);
+                channel1.register(selector, SelectionKey.OP_READ);
+                channel2.register(selector, SelectionKey.OP_READ);
             }
             finally {
                 this.selectorLock.unlock();
@@ -70,6 +72,8 @@ public class RelayingTask implements Runnable {
             socksMap.put(channel2, channel1);
             bufMap.putIfAbsent(channel1, ByteBuffer.allocate(4096));
             bufMap.putIfAbsent(channel2, ByteBuffer.allocate(4096));
+            remoteAddrs.putIfAbsent(channel1, channel1.getRemoteAddress());
+            remoteAddrs.putIfAbsent(channel2, channel2.getRemoteAddress());
             clients.putIfAbsent(channel1, true);
             return true;
         }
@@ -96,37 +100,114 @@ public class RelayingTask implements Runnable {
         int nselect;
         while (true){
             try{
-                nselect = this.selector.select();//This can be blocking
+                nselect = this.selector.select();//This can block register。
                 if(nselect <= 0){
                     //可以被唤醒
-                    System.out.println("被唤醒");
                     try{
                         this.selectorLock.lock();//用锁来阻止再度堕入select睡眠
                     }
                     finally {
                         this.selectorLock.unlock();
                     }
-                    System.out.println("继续select睡");
                     continue;
                 }
+                logger.info("channels selected:{}",nselect);
                 Set<SelectionKey> keys = this.selector.selectedKeys();
                 Iterator<SelectionKey> it = keys.iterator();
-                HashMap<SocketChannel,SelectionKey> readyChannels = new HashMap<>();
                 while (it.hasNext()){
                     SelectionKey selectionKey = it.next();
-                    readyChannels.put((SocketChannel) selectionKey.channel(), selectionKey);
                     it.remove();
+                    handleReadyChannel(selectionKey);
                 }
-                handleReadyChannels(readyChannels);
             }
             catch (Exception ex){
                 ex.printStackTrace();
-                logger.error("error",ex.getMessage());
+                logger.error("error",ex);
             }
 
         }
     }
 
+    private void handleReadyChannel(SelectionKey ready) throws IOException{
+        handleReadable(ready);
+
+    }
+
+    private HandleChannelResult handleReadable(SelectionKey readableKey) throws IOException{
+        SocketChannel sc = (SocketChannel) readableKey.channel();
+        try {
+            if (!readableKey.isReadable()) {
+                return HandleChannelResult.NotType;
+            }
+            //Read !
+            ByteBuffer bb = this.bufMap.get(sc);
+            int n = sc.read(bb);
+            if (n == -1) {
+                //https://stackoverflow.com/questions/7937908/java-selector-returns-selectionkey-with-op-read-without-data-in-infinity-loop-af
+                //or check OP_READ, select can return on remote closed
+                logger.error("读到-1，远程关闭了啊？{}", remoteAddrs.get(sc));
+                return HandleChannelResult.Failed;
+            }
+            System.out.println("读取完毕，字节数"+n);
+            //Write !
+            SocketChannel partner = this.socksMap.get(sc);
+            bb.flip();
+            n = partner.write(bb);
+            bb.clear();
+            System.out.println("写入完毕，字节数"+n);
+            return HandleChannelResult.Success;
+
+        }
+        catch (CancelledKeyException|ClosedChannelException ex){
+            //CancelledKeyException is throwned by isReadable(). This often caused by channel is closed and automatically deregistered
+            //ClosedChannelException is throwned by common io operations like getRemoteAddress
+            //ex.printStackTrace();
+            System.out.println("远程关闭了。Remote addr:"+remoteAddrs.get(sc));
+            return HandleChannelResult.Failed;
+        }
+        catch (IOException ex){
+            System.out.println("神奇的错误啊");
+            ex.printStackTrace();
+            return HandleChannelResult.Failed;
+        }
+    }
+
+    /*
+    private HandleChannelResult handleWritable(SelectionKey writableKey) throws IOException{
+        SocketChannel sc = (SocketChannel)writableKey.channel();
+        try{
+            if(!writableKey.isWritable()){
+                return HandleChannelResult.NotType;
+            }
+            logger.info("writable");
+            ByteBuffer bb = this.bufMap.get(socksMap.get(sc));
+            bb.flip();
+            int n = sc.write(bb);
+            bb.clear();
+            if(n == -1){
+                return HandleChannelResult.Failed;
+            }
+            sc.register(selector, SelectionKey.OP_READ);//To prevent always writable.
+            return HandleChannelResult.Success;
+        }
+        catch (CancelledKeyException|ClosedChannelException ex){
+            ex.printStackTrace();
+            System.out.println("Remote addr:"+remoteAddrs.get(sc));
+            return HandleChannelResult.Failed;
+        }
+    }
+
+     */
+
+    private enum HandleChannelResult{
+
+        Failed,
+        Success,
+        NotType
+
+    }
+
+    /*
     private void handleReadyChannels(HashMap<SocketChannel, SelectionKey> readyChannels) throws IOException{
         for(Map.Entry<SocketChannel, SelectionKey> readyChannel: readyChannels.entrySet()) {
             SocketChannel readChannel = readyChannel.getKey();
@@ -157,22 +238,22 @@ public class RelayingTask implements Runnable {
                 readBuffer.clear();
                 logger.info("finish relay, data count: {}", total);
             } catch (CancelledKeyException | ClosedChannelException ex) {
+                ex.printStackTrace();
                 onPeerDisconnect(readKey, writeKey);
             }
         }
     }
 
-    private void onPeerDisconnect(SelectionKey readKey, SelectionKey writeKey){
+    private void onPeerDisconnect(SelectionKey readKey, SelectionKey writeKey) throws IOException{
         logger.info("Peer close the socket. Renew for target or close relay for client");
-        if(!readKey.isValid() && !isClient(readKey)){
-            fixRelay(readKey, writeKey);
+        SelectionKey clientKey = isClient(readKey)?readKey:writeKey;
+        SelectionKey tgtKey = isClient(readKey)?writeKey:readKey;
+        if(!clientKey.isValid()){
+            closeEverything(clientKey, tgtKey);
+            return;
         }
-        else if(!writeKey.isValid() && !isClient(readKey)){
-            fixRelay(readKey, writeKey);
-        }
-        else{
-            closeEverything( readKey, writeKey);
-        }
+        fixConnection(tgtKey);
+        logger.info("target disconnected. Reconnected");
     }
 
     private boolean isClient(SelectionKey key){
@@ -197,23 +278,18 @@ public class RelayingTask implements Runnable {
         logger.info("Relay channel closed");
     }
 
-    private void fixRelay(SelectionKey key, SelectionKey key2){
-        SocketChannel channel = (SocketChannel)key.channel();
-        SocketChannel channel2 = (SocketChannel)key2.channel();
-        try{
-            SocketAddress remoteAddress = channel.getRemoteAddress();
-            this.socksMap.remove(channel);
-            this.bufMap.remove(channel);
-            SocketChannel newChannel = SocketChannel.open();
-            newChannel.connect(remoteAddress);
-            registerImpl(newChannel, channel2);
-            logger.info("target channel rebuilt");
-        }
-        catch (Exception ex){
-            closeEverything(key, key2);
-        }
-
+    private void fixConnection(SelectionKey tgtKey) throws IOException{
+        SocketChannel tgtChannel = (SocketChannel) tgtKey.channel();
+        SocketChannel clientChannel = this.socksMap.get(tgtChannel);
+        SocketAddress remoteAddress = tgtChannel.getRemoteAddress();//TODO:这里可能报错，需要提前把remoteAddress读出来注册
+        this.socksMap.remove(tgtChannel);
+        this.bufMap.remove(tgtChannel);
+        SocketChannel newChannel = SocketChannel.open();
+        newChannel.connect(remoteAddress);
+        registerImpl(newChannel, clientChannel);
     }
 
+
+     */
 
 }
