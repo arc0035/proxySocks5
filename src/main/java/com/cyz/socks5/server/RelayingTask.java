@@ -79,7 +79,7 @@ public class RelayingTask implements Runnable {
         }
         catch (IOException ex){
             ex.printStackTrace();
-            logger.error("Error happening on mapping channels", ex);
+            logger.error("Error happening on registering channels", ex);
             return false;
         }
     }
@@ -155,7 +155,6 @@ public class RelayingTask implements Runnable {
             catch (IOException ex){
                 logger.error("Reconnect failed, releasing peer socket resource.", ex);
                 cleanSocketResource(target);
-                logger.info("{}",this.socksMap.size());
                 return false;
             }
         }
@@ -174,7 +173,8 @@ public class RelayingTask implements Runnable {
                 }
             }
             catch (IOException ex){
-                logger.error("Reconnect failed", ex);
+                logger.error("Reconnect failed, releasing peer socket resource.", ex);
+                cleanSocketResource(client);
                 return false;
             }
         }
