@@ -14,8 +14,8 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * 专门做流量转发的线程.
  */
-public class RelayingTask implements Runnable {
-    private static final Logger logger = LoggerFactory.getLogger(RelayingTask.class);
+public class TcpRelayingTask implements Runnable {
+    private static final Logger logger = LoggerFactory.getLogger(TcpRelayingTask.class);
     private boolean started;
     private ConcurrentHashMap<SocketChannel, SocketChannel>  socksMap;
     private ConcurrentHashMap<SocketChannel, ByteBuffer>  bufMap;
@@ -24,18 +24,18 @@ public class RelayingTask implements Runnable {
     private Selector selector;
     private ReentrantLock selectorLock;
 
-    private static RelayingTask INSTANCE;
+    private static TcpRelayingTask INSTANCE;
 
     static {
         try{
-            INSTANCE = new RelayingTask();
+            INSTANCE = new TcpRelayingTask();
         }
         catch (Exception ex){
             throw new RuntimeException(ex);
         }
     }
 
-    private RelayingTask() throws IOException{
+    private TcpRelayingTask() throws IOException{
         this.started = false;
         this.socksMap = new ConcurrentHashMap<>();
         this.bufMap = new ConcurrentHashMap<>();

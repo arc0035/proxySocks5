@@ -6,11 +6,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.*;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Properties;
 import java.util.concurrent.*;
 
 public class Socks5Server implements Closeable {
@@ -41,7 +39,7 @@ public class Socks5Server implements Closeable {
                 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), (r, executor) -> {
                     throw new RejectedExecutionException();
                 });
-        RelayingTask.start();
+        TcpRelayingTask.start();
         log.info("Socks5 proxy server started, listening on {}", config.getPort());
         while (true){
             try{

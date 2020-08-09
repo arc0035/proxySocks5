@@ -1,18 +1,12 @@
 package com.cyz.socks5.server.state;
 
-import com.cyz.socks5.server.RelayingTask;
+import com.cyz.socks5.server.TcpRelayingTask;
 import com.cyz.socks5.server.enums.ServerStatusEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Iterator;
-import java.util.Set;
 
 public class ConnectedState implements ProxyState {
     private static final Logger logger = LoggerFactory.getLogger(ConnectedState.class);
@@ -22,7 +16,7 @@ public class ConnectedState implements ProxyState {
      * 解决办法，要么继续分出一个线程，要么IO多路复用，这里使用IO多路复用，优点是单线程处理数据，简单。
      */
     public ConnectedState(SocketChannel srcChannel, SocketChannel tgtChannel)  throws IOException{
-        RelayingTask.register(srcChannel, tgtChannel);
+        TcpRelayingTask.register(srcChannel, tgtChannel);
     }
     @Override
     public ProxyState next() throws IOException {

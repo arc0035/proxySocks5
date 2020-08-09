@@ -32,6 +32,9 @@ public enum ServerStatusEnum {
 
 
     Relaying,
+
+    Udp,
+
     /**
      * 客户端断开连接
      */
