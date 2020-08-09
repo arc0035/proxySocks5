@@ -11,10 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ConnectException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.net.*;
 import java.nio.channels.SocketChannel;
 
 /**
@@ -97,6 +94,7 @@ public class CommandProcessState implements ProxyState{
         try{
             logger.info("making connection to {}:{}", host, port);
             tgtChannel = SocketChannel.open();
+            tgtChannel.setOption(StandardSocketOptions.SO_KEEPALIVE, true); //设置keepalve
             InetAddress tgtInet = InetAddress.getByName(host);
             tgtChannel.connect(new InetSocketAddress(tgtInet, port));
         }
