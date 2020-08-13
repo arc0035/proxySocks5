@@ -1,7 +1,7 @@
 package com.cyz.socks5.server;
 
 import com.cyz.socks5.server.enums.AddrTypeEnum;
-import com.cyz.socks5.server.enums.ClientErrorEnum;
+import com.cyz.socks5.server.enums.CommonErrorEnum;
 import com.cyz.socks5.server.error.ProxyServerException;
 import com.cyz.socks5.server.host.DomainHostResolver;
 import com.cyz.socks5.server.host.HostAddrResolver;
@@ -39,7 +39,7 @@ public class HostResolver {
         try {
             HostAddrResolver hostResolver = this.hostResolvers.get(addrType);
             if(hostResolver == null){
-                throw new ProxyServerException(ClientErrorEnum.InvalidAddressType);
+                throw new ProxyServerException(CommonErrorEnum.InvalidAddressType);
             }
             return hostResolver.resolve(dstAddr);
 

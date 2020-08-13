@@ -2,7 +2,7 @@ package com.cyz.socks5.server.state;
 
 import com.cyz.socks5.server.config.ServerConfig;
 import com.cyz.socks5.server.enums.ServerStatusEnum;
-import com.cyz.socks5.server.enums.ClientErrorEnum;
+import com.cyz.socks5.server.enums.CommonErrorEnum;
 import com.cyz.socks5.server.error.ProxyServerException;
 import com.cyz.socks5.server.message.HandshakeRequest;
 import com.cyz.socks5.server.message.HandshakeResponse;
@@ -48,7 +48,7 @@ public class InitState implements ProxyState {
                 }
             }
             if(!support){
-                throw new ProxyServerException(ClientErrorEnum.NoSupportAuthenticationMethod);
+                throw new ProxyServerException(CommonErrorEnum.NoSupportAuthenticationMethod);
             }
             //回复客户
             HandshakeResponse response = new HandshakeResponse();
@@ -68,10 +68,10 @@ public class InitState implements ProxyState {
     private void verify(HandshakeRequest request){
         if(request.getVersion() != (byte)0x05){
             logger.warn("version "+request.getVersion());
-            throw new ProxyServerException(ClientErrorEnum.InvalidVersion);
+            throw new ProxyServerException(CommonErrorEnum.InvalidVersion);
         }
         if(request.getMethodCount() <= 0){
-            throw new ProxyServerException(ClientErrorEnum.BadAuthenticationMethodCount);
+            throw new ProxyServerException(CommonErrorEnum.BadAuthenticationMethodCount);
         }
     }
 

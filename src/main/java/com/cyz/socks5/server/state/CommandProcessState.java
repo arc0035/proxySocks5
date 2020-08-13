@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.*;
+import java.nio.channels.DatagramChannel;
 import java.nio.channels.SocketChannel;
 
 /**
@@ -81,7 +82,7 @@ public class CommandProcessState implements ProxyState{
             host = this.hostResolver.resolveHost(request.getAddressType(), request.getDstAddr());
         }
         catch (ProxyServerException pse){
-            if(pse.getErrorEnum() == ClientErrorEnum.InvalidAddressType){
+            if(pse.getErrorEnum() == CommonErrorEnum.InvalidAddressType){
                 return onBadAddressType();
             }
         }
@@ -118,11 +119,27 @@ public class CommandProcessState implements ProxyState{
     private ProxyState onBind(CommandRequest request){
         //如果当前已经是connected状态，就监听某一端口
         //问题：怎么用
-        throw new ProxyServerException(ClientErrorEnum.InvalidCmdOpcode);
+        throw new ProxyServerException(CommonErrorEnum.InvalidCmdOpcode);
     }
 
     private ProxyState onUdp(CommandRequest request){
-        throw new ProxyServerException(ClientErrorEnum.InvalidCmdOpcode);
+        try{
+            //udp channel for client
+            DatagramChannel channel = DatagramChannel.open();
+            //0 means allocate random ip
+            channel.bind(new InetSocketAddress(serverConfig.getIp(), 0));
+            channel.configureBlocking(false);
+
+            //udp channel for server
+            //TODO
+
+        }
+        catch (IOException ex){
+            ex.printStackTrace();
+            return DisconnectedState.INSTANCE;
+        }
+
+        return new RelayingState();
     }
 
 

@@ -4,7 +4,7 @@ import com.cyz.socks5.server.authentication.Authenticator;
 import com.cyz.socks5.server.authentication.Authenticators;
 import com.cyz.socks5.server.config.ServerConfig;
 import com.cyz.socks5.server.enums.ServerStatusEnum;
-import com.cyz.socks5.server.enums.ClientErrorEnum;
+import com.cyz.socks5.server.enums.CommonErrorEnum;
 import com.cyz.socks5.server.error.ProxyServerException;
 import com.cyz.socks5.server.message.AuthenticationResultResponse;
 import org.slf4j.Logger;
@@ -40,7 +40,7 @@ public class AuthenticatingState implements ProxyState {
                 logger.info("Authentication succeeded, waiting for command");
                 return new CommandProcessState(this.serverConfig, this.socket);
             }
-            throw new ProxyServerException(ClientErrorEnum.AuthenticationFailed);
+            throw new ProxyServerException(CommonErrorEnum.AuthenticationFailed);
         }
         catch (ProxyServerException pse){
             logger.warn("Authentication failed, switch to basic status :{}", pse.getMessage());

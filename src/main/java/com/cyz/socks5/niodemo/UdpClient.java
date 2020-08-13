@@ -26,5 +26,6 @@ public class UdpClient {
         buf.flip();
         /*发送UDP数据包*/
         int bytesSent=channel.send(buf, new InetSocketAddress("127.0.0.1",6666));
+        System.in.read();
     }
 }
