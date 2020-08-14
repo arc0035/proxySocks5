@@ -3,7 +3,9 @@ package com.cyz.socks5.server;
 import com.cyz.socks5.server.enums.CommonErrorEnum;
 import com.cyz.socks5.server.error.ProxyServerException;
 
+import javax.xml.crypto.Data;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -20,7 +22,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class UdpRelayingManager {
 
     private static Selector selector;
-    private static Map<DatagramChannel, DatagramChannel> channels;
+    private static Map<DatagramChannel, DatagramChannel> channelMap;
+    private static Map<DatagramChannel, ByteBuffer> channelBuf;
     private static AtomicBoolean started;
 
     private static ReentrantLock lock;
@@ -29,7 +32,8 @@ public class UdpRelayingManager {
     static {
         try{
             selector = Selector.open();
-            channels = new HashMap<>();
+            channelMap = new HashMap<>();
+            channelBuf = new HashMap<>();
             started = new AtomicBoolean(false);
             lock = new ReentrantLock();
             condition = lock.newCondition();
@@ -45,8 +49,10 @@ public class UdpRelayingManager {
             selector.wakeup();
             client.register(selector, SelectionKey.OP_READ);
             target.register(selector, SelectionKey.OP_READ);
-            channels.put(client, target);
-            channels.put(target, client);
+            channelMap.putIfAbsent(client, target);
+            channelMap.putIfAbsent(target, client);
+            channelBuf.putIfAbsent(client, ByteBuffer.allocate(4096));
+            channelBuf.putIfAbsent(target, ByteBuffer.allocate(4096));
             registering = false;
             condition.signal();
         }
@@ -82,7 +88,7 @@ public class UdpRelayingManager {
                 while (it.hasNext()){
                     SelectionKey key = it.next();
                     if(key.isReadable()){
-                        //handleRead();
+                        handleRead(key);
                     }
 
                     it.remove();
@@ -90,6 +96,15 @@ public class UdpRelayingManager {
             }
             catch (IOException ex){}
         }
+    }
+
+    private static void handleRead(SelectionKey key){
+        /*
+        DatagramChannel srcChannel = (DatagramChannel)key.channel();
+        ByteBuffer readBuf = channelBuf.get(srcChannel);
+        DatagramChannel tgtChannel = channelMap.get(srcChannel);
+        srcChannel.receive(readBuf);
+        */
     }
 
 }
