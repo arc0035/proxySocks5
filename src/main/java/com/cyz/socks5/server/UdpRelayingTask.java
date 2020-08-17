@@ -2,8 +2,9 @@ package com.cyz.socks5.server;
 
 import com.cyz.socks5.server.enums.CommonErrorEnum;
 import com.cyz.socks5.server.error.ProxyServerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -19,8 +20,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * @Description
  * @data 2020/08/13
  */
-public class UdpRelayingManager {
+public class UdpRelayingTask {
 
+    private static final Logger logger = LoggerFactory.getLogger(UdpRelayingTask.class);
     private static Selector selector;
     private static Map<DatagramChannel, DatagramChannel> channelMap;
     private static Map<DatagramChannel, ByteBuffer> channelBuf;
@@ -41,12 +43,13 @@ public class UdpRelayingManager {
         catch (Exception ex){throw new RuntimeException();}
     }
 
-    //TODO:有没有释放资源的途径?
     public static void register(DatagramChannel client, DatagramChannel target){
         try{
             lock.lock();
             registering = true;
             selector.wakeup();
+            client.configureBlocking(false);
+            target.configureBlocking(false);
             client.register(selector, SelectionKey.OP_READ);
             target.register(selector, SelectionKey.OP_READ);
             channelMap.putIfAbsent(client, target);
@@ -68,6 +71,10 @@ public class UdpRelayingManager {
         if(!started.compareAndSet(false, true)){
            return;
         }
+        new Thread(() -> mainLoop(), "udp-relaying-thread").start();
+    }
+
+    private static void mainLoop(){
         while (true){
             try{
                 int nselect = selector.select();
@@ -90,21 +97,33 @@ public class UdpRelayingManager {
                     if(key.isReadable()){
                         handleRead(key);
                     }
-
                     it.remove();
                 }
             }
-            catch (IOException ex){}
+            catch (Exception ex){
+                logger.error("Should not reach here", ex);
+            }
         }
     }
 
     private static void handleRead(SelectionKey key){
-        /*
-        DatagramChannel srcChannel = (DatagramChannel)key.channel();
-        ByteBuffer readBuf = channelBuf.get(srcChannel);
-        DatagramChannel tgtChannel = channelMap.get(srcChannel);
-        srcChannel.receive(readBuf);
-        */
+        try{
+            DatagramChannel srcChannel = (DatagramChannel)key.channel();
+            ByteBuffer readBuf = channelBuf.get(srcChannel);
+            DatagramChannel tgtChannel = channelMap.get(srcChannel);
+            srcChannel.receive(readBuf);
+            int nread = readBuf.position();
+            System.out.println("读到数据:"+nread);
+            if(nread == 0){
+                return;
+            }
+            readBuf.flip();
+            tgtChannel.write(readBuf);
+            readBuf.clear();
+        }
+        catch (IOException ex){
+            logger.error("", ex);
+        }
     }
 
 }

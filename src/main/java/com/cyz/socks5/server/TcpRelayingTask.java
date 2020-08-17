@@ -89,7 +89,7 @@ public class TcpRelayingTask implements Runnable {
             logger.warn("alread started");
             return;
         }
-        new Thread(this,"relaying-thread").start();
+        new Thread(this,"tcp-relaying-thread").start();
         started = true;
     }
 

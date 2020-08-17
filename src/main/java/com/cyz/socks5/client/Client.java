@@ -10,7 +10,12 @@ import com.cyz.socks5.server.message.*;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.util.Arrays;
 
 /**
@@ -34,13 +39,13 @@ public class Client {
         Thread.sleep(1000);
         testAuthenticate(socket);
         Thread.sleep(1000);
-        //testCmd(socket, "127.0.0.1",8000);
-        testCmd(socket, "www.baidu.com",80);
-
-        testChat(socket);
+        CommandResponse response = testCmd(socket, CommandTypeEnum.UDP, "127.0.0.1",8000);
+      //  testCmd(socket, CommandTypeEnum.CONNECT,"www.baidu.com",80);
+        //testTcpChat(socket);
+        testUdpChat(new InetSocketAddress(new HostResolver().resolveHost(response.getAddressType(), response.getBndAddr()), response.getBndPort()));
     }
 
-    private static void testChat(Socket socket) throws Exception {
+    private static void testTcpChat(Socket socket) throws Exception {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while(true){
             String line = reader.readLine();
@@ -48,6 +53,7 @@ public class Client {
                 socket.close();
                 return;
             }
+            line+="\n";
             socket.getOutputStream().write(line.getBytes());
             byte[] bytes = new byte[1024];
             int n = socket.getInputStream().read(bytes);
@@ -57,6 +63,31 @@ public class Client {
             else{
                 System.out.println("[服务端]:"+new String(Arrays.copyOfRange(bytes, 0, n)));
             }
+
+        }
+    }
+
+    private static void testUdpChat(SocketAddress relay) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        DatagramChannel udpChannel = DatagramChannel.open();
+        udpChannel.connect(relay);
+        while(true){
+            String line = reader.readLine();
+            if("bye".compareToIgnoreCase(line) == 0){
+                return;
+            }
+            udpChannel.write(ByteBuffer.wrap(line.getBytes()));
+            /*
+            ByteBuffer bb = ByteBuffer.allocate(1024);
+            int n = udpChannel.read(bb);
+            if(n <= 0){
+                System.out.println("读到："+n);
+            }
+            else{
+                System.out.println("[服务端]:"+new String(Arrays.copyOfRange(bb.array(), 0, n)));
+            }
+
+             */
 
         }
     }
@@ -114,10 +145,10 @@ public class Client {
     }
 
 
-    private static void testCmd(Socket proxy, String tgtHost, int tgtPort) throws IOException {
+    private static CommandResponse testCmd(Socket proxy, CommandTypeEnum cmd, String tgtHost, int tgtPort) throws IOException {
         System.out.println("发送命令");
         CommandRequest request = new CommandRequest();
-        request.setCmd((byte)CommandTypeEnum.CONNECT.getCode());
+        request.setCmd((byte)cmd.getCode());
         request.setAddressType((byte)AddrTypeEnum.DOMAIN.getCode());
         request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), tgtHost));
         //request.setDstAddr(new HostResolver().hostToBytes(AddrTypeEnum.DOMAIN.getCode(), "www.baiduahefa.com"));
@@ -129,6 +160,8 @@ public class Client {
         CommandResponse result = new CommandResponse();
         result.deserialize(proxy.getInputStream());
         System.out.println(CommandResponseEnum.fromCode(result.getResponse()).name());
+        System.out.println(result.getBndPort());
+        return result;
     }
 
 }

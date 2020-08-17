@@ -13,10 +13,10 @@ public class UdpServer {
         //Udp 实践
 
         DatagramChannel channel=DatagramChannel.open();
-        channel.socket().bind(new InetSocketAddress(6666));
-
+        channel.socket().bind(new InetSocketAddress(8000));
+        InetSocketAddress socketAddress = (InetSocketAddress) channel.getLocalAddress();
         while(true){
-            ByteBuffer buf=ByteBuffer.allocate(48);
+            ByteBuffer buf=ByteBuffer.allocate(1024);
             buf.clear();
             /*阻塞，等待发来的数据*/
             InetSocketAddress remote = (InetSocketAddress) channel.receive(buf);

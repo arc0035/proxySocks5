@@ -40,6 +40,7 @@ public class Socks5Server implements Closeable {
                     throw new RejectedExecutionException();
                 });
         TcpRelayingTask.start();
+        UdpRelayingTask.start();
         log.info("Socks5 proxy server started, listening on {}", config.getPort());
         while (true){
             try{

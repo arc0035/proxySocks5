@@ -56,24 +56,21 @@ public class SocketHandler implements Runnable, Closeable {
                 state = DisconnectedState.INSTANCE;
             }
         }
+        log.info("退出线程 {}",Thread.currentThread().getName());
 
         try{
+            //握手的连接和实际转发的连接要区分开
             this.close();
         }
         catch (Exception ex){}
 
-        log.info("退出线程 {}",Thread.currentThread().getName());
     }
 
 
     @Override
     public void close() throws IOException {
-        //可以通过soLinger选项指定socket在close时是否把未发送干净的数据都发送干净
-        /*
         if(socket != null){
             socket.close();;
         }
-
-         */
     }
 }

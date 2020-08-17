@@ -1,5 +1,6 @@
 package com.cyz.socks5.server.state;
 
+import com.cyz.socks5.server.UdpRelayingTask;
 import com.cyz.socks5.server.config.ServerConfig;
 import com.cyz.socks5.server.enums.*;
 import com.cyz.socks5.server.error.ProxyServerException;
@@ -108,7 +109,7 @@ public class CommandProcessState implements ProxyState{
         cmdResponse.setVersion((byte)0x05);
         cmdResponse.setResponse((byte)CommandResponseEnum.SUCCESS.getCode());
         cmdResponse.setAddressType((byte)AddrTypeEnum.IPV4.getCode());
-        cmdResponse.setBndAddr(this.hostResolver.hostToBytes(AddrTypeEnum.IPV4.getCode(), this.serverConfig.getIp()));
+        cmdResponse.setBndAddr(this.hostResolver.hostToBytes(AddrTypeEnum.IPV4.getCode(), this.socket.getLocalAddress().getHostAddress()));
         cmdResponse.setBndPort(this.serverConfig.getPort());
         cmdResponse.serialize(this.socket.getOutputStream());
         //切换到connected状态
@@ -125,14 +126,28 @@ public class CommandProcessState implements ProxyState{
     private ProxyState onUdp(CommandRequest request){
         try{
             //udp channel for client
-            DatagramChannel channel = DatagramChannel.open();
-            //0 means allocate random ip
-            channel.bind(new InetSocketAddress(serverConfig.getIp(), 0));
-            channel.configureBlocking(false);
-
+            DatagramChannel clientChannel = DatagramChannel.open();
+            //0 means allocate random port
+            InetSocketAddress iAdd = new InetSocketAddress("localhost", 0);
+            clientChannel.bind(iAdd);
+            clientChannel.configureBlocking(false);
+            InetSocketAddress localUdpAddr = (InetSocketAddress) clientChannel.getLocalAddress();
             //udp channel for server
-            //TODO
-
+            DatagramChannel tgtChannel = DatagramChannel.open();
+            String host = hostResolver.resolveHost(request.getAddressType(), request.getDstAddr());
+            tgtChannel.connect(new InetSocketAddress(InetAddress.getByName(host), request.getDstPort()));
+            //register
+            UdpRelayingTask.register(clientChannel, tgtChannel);
+            //response
+            CommandResponse cmdResponse = new CommandResponse();
+            cmdResponse.setVersion((byte)0x05);
+            cmdResponse.setResponse((byte)CommandResponseEnum.SUCCESS.getCode());
+            cmdResponse.setAddressType((byte)AddrTypeEnum.IPV4.getCode());
+            cmdResponse.setBndAddr(this.hostResolver.hostToBytes(AddrTypeEnum.IPV4.getCode(),localUdpAddr.getHostString()));
+            cmdResponse.setBndPort(localUdpAddr.getPort());
+            cmdResponse.serialize(this.socket.getOutputStream());
+            //close handshake sockets
+            this.socket.close();
         }
         catch (IOException ex){
             ex.printStackTrace();
